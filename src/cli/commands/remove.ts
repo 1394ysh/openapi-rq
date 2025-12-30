@@ -1,23 +1,10 @@
-import fs from "fs/promises";
-import path from "path";
 import chalk from "chalk";
 import inquirer from "inquirer";
-
-const CONFIG_FILE_NAME = "orq.config.json";
+import { loadConfigSimple, saveConfig, getConfigPath } from "../../config/loader.js";
 
 interface RemoveOptions {
   name?: string;
   force?: boolean;
-}
-
-interface SpecConfig {
-  url: string;
-  description?: string;
-}
-
-interface OrqConfig {
-  specs?: Record<string, SpecConfig>;
-  [key: string]: unknown;
 }
 
 /**
@@ -29,8 +16,7 @@ export async function runRemove(options: RemoveOptions): Promise<void> {
   console.log(chalk.bold("========================================\n"));
 
   // Load config file
-  const configPath = path.join(process.cwd(), CONFIG_FILE_NAME);
-  const config = await loadConfig(configPath);
+  const config = await loadConfigSimple();
 
   if (!config) {
     console.log(chalk.red("orq.config.json not found."));
@@ -88,20 +74,8 @@ export async function runRemove(options: RemoveOptions): Promise<void> {
   // Remove
   delete config.specs![specName!];
 
-  await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+  await saveConfig(config);
 
   console.log(chalk.green(`\n✓ ${specName} removed successfully!`));
   console.log("");
-}
-
-/**
- * Load config file
- */
-async function loadConfig(configPath: string): Promise<OrqConfig | null> {
-  try {
-    const content = await fs.readFile(configPath, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return null;
-  }
 }

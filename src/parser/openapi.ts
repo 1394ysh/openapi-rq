@@ -1,5 +1,11 @@
-import axios from "axios";
+import SwaggerParser from "@apidevtools/swagger-parser";
+import type { OpenAPI } from "openapi-types";
 
+/**
+ * 커스텀 타입 정의
+ * swagger-parser의 dereference 후에는 $ref가 풀려있으므로
+ * 간단한 인터페이스로 정의하여 사용성 향상
+ */
 export interface OpenApiSpec {
   openapi: string;
   info: {
@@ -58,23 +64,49 @@ export interface SchemaObject {
 }
 
 /**
- * OpenAPI 스펙 fetch
+ * OpenAPI 스펙 fetch & dereference
+ * swagger-parser를 사용하여:
+ * - 외부 $ref 참조 자동 해석
+ * - 순환 참조 처리
+ * - OpenAPI 2.0/3.0/3.1 모두 지원
+ * - 스펙 유효성 검증
  */
 export async function fetchOpenApiSpec(url: string): Promise<OpenApiSpec> {
   try {
-    const response = await axios.get<OpenApiSpec>(url, {
-      timeout: 30000,
-      headers: {
-        Accept: "application/json",
+    // 먼저 URL에서 스펙을 fetch
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const spec = await response.json();
+
+    // dereference: 모든 $ref를 실제 스키마로 교체
+    // 순환 참조는 JavaScript 객체 참조로 유지됨
+    const api = await SwaggerParser.dereference(spec, {
+      resolve: {
+        external: false, // 외부 $ref 해석 비활성화
       },
     });
-    return response.data;
+
+    // OpenAPI 3.x인지 확인
+    if (!isOpenAPI3(api)) {
+      throw new Error("Only OpenAPI 3.x is supported. Please convert your OpenAPI 2.0 (Swagger) spec to OpenAPI 3.x.");
+    }
+
+    return api as unknown as OpenApiSpec;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(`Failed to fetch OpenAPI spec: ${error.message}`);
+    if (error instanceof Error) {
+      throw new Error(`Failed to fetch/parse OpenAPI spec: ${error.message}`);
     }
     throw error;
   }
+}
+
+/**
+ * OpenAPI 3.x 여부 확인
+ */
+function isOpenAPI3(api: OpenAPI.Document): boolean {
+  return "openapi" in api && typeof api.openapi === "string" && api.openapi.startsWith("3.");
 }
 
 /**

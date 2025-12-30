@@ -1,31 +1,5 @@
-import fs from "fs/promises";
-import path from "path";
 import chalk from "chalk";
-
-const CONFIG_FILE_NAME = "orq.config.json";
-
-interface SpecConfig {
-  url: string;
-  description?: string;
-}
-
-interface OrqConfig {
-  specs?: Record<string, SpecConfig>;
-  [key: string]: unknown;
-}
-
-/**
- * Load config file
- */
-async function loadConfig(): Promise<OrqConfig | null> {
-  const configPath = path.join(process.cwd(), CONFIG_FILE_NAME);
-  try {
-    const content = await fs.readFile(configPath, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return null;
-  }
-}
+import { loadConfigSimple } from "../../config/loader.js";
 
 /**
  * List registered OpenAPI specs
@@ -35,7 +9,7 @@ export async function listSpecs(): Promise<void> {
   console.log(chalk.bold("  orq - Registered Specs"));
   console.log(chalk.bold("========================================\n"));
 
-  const config = await loadConfig();
+  const config = await loadConfigSimple();
 
   if (!config) {
     console.log(chalk.red("orq.config.json not found."));

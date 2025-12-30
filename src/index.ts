@@ -37,9 +37,9 @@ program
     }
   });
 
-// Generate command (default)
+// Generate command
 program
-  .command("generate", { isDefault: true })
+  .command("generate")
   .aliases(["g", "gen"])
   .description("Generate API code interactively")
   .option("-s, --spec <name>", "Specify OpenAPI spec name directly")
@@ -143,5 +143,25 @@ program
       process.exit(1);
     }
   });
+
+// Handle unknown commands
+program.on("command:*", (operands) => {
+  console.error(chalk.red(`\nError: Unknown command '${operands[0]}'`));
+  console.log(`\nAvailable commands:`);
+  console.log(`  init     Initialize project configuration`);
+  console.log(`  generate (g, gen)  Generate API code`);
+  console.log(`  list (ls)          List available specs`);
+  console.log(`  add                Add a new spec`);
+  console.log(`  remove (rm)        Remove a spec`);
+  console.log(`  sync               Sync all specs`);
+  console.log(`  create (new)       Create placeholder API`);
+  console.log(`\nRun ${chalk.cyan("orq --help")} for more information.`);
+  process.exit(1);
+});
+
+// Show help if no command provided
+if (process.argv.length === 2) {
+  program.help();
+}
 
 program.parse();

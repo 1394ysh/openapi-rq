@@ -1,25 +1,12 @@
-import fs from "fs/promises";
-import path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import inquirer from "inquirer";
-import axios from "axios";
-
-const CONFIG_FILE_NAME = "orq.config.json";
+import SwaggerParser from "@apidevtools/swagger-parser";
+import { loadConfigSimple, saveConfig } from "../../config/loader.js";
 
 interface AddOptions {
   name?: string;
   url?: string;
-}
-
-interface SpecConfig {
-  url: string;
-  description?: string;
-}
-
-interface OrqConfig {
-  specs?: Record<string, SpecConfig>;
-  [key: string]: unknown;
 }
 
 /**
@@ -31,8 +18,7 @@ export async function runAdd(options: AddOptions): Promise<void> {
   console.log(chalk.bold("========================================\n"));
 
   // Load config file
-  const configPath = path.join(process.cwd(), CONFIG_FILE_NAME);
-  const config = await loadConfig(configPath);
+  const config = await loadConfigSimple();
 
   if (!config) {
     console.log(chalk.red("orq.config.json not found."));
@@ -80,19 +66,14 @@ export async function runAdd(options: AddOptions): Promise<void> {
     specUrl = url;
   }
 
-  // Validate URL
+  // Validate URL using swagger-parser
   const spinner = ora("Validating OpenAPI spec...").start();
   try {
-    const response = await axios.get(specUrl!, { timeout: 10000 });
-    const spec = response.data;
-
-    if (!spec.openapi && !spec.swagger) {
-      spinner.fail("Not a valid OpenAPI spec.");
-      return;
-    }
+    // swagger-parser가 URL에서 스펙을 가져오고 유효성 검증까지 수행
+    const spec = await SwaggerParser.validate(specUrl!);
 
     const title = spec.info?.title || specName;
-    const version = spec.openapi || spec.swagger;
+    const version = "openapi" in spec ? spec.openapi : (spec as { swagger?: string }).swagger;
     const endpointCount = Object.keys(spec.paths || {}).length;
 
     spinner.succeed(`OpenAPI ${version} spec validated (${endpointCount} endpoints)`);
@@ -114,7 +95,7 @@ export async function runAdd(options: AddOptions): Promise<void> {
       description: description || undefined,
     };
 
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+    await saveConfig(config);
 
     console.log(chalk.green(`\n✓ ${specName} added successfully!`));
     console.log(chalk.gray(`  URL: ${specUrl}`));
@@ -123,22 +104,7 @@ export async function runAdd(options: AddOptions): Promise<void> {
     console.log(chalk.cyan(`Run 'orq generate --spec ${specName}' to generate API code.`));
     console.log("");
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      spinner.fail(`Failed to access URL: ${error.message}`);
-    } else {
-      spinner.fail("Error validating spec.");
-    }
-  }
-}
-
-/**
- * Load config file
- */
-async function loadConfig(configPath: string): Promise<OrqConfig | null> {
-  try {
-    const content = await fs.readFile(configPath, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return null;
+    const message = error instanceof Error ? error.message : "Unknown error";
+    spinner.fail(`Failed to validate spec: ${message}`);
   }
 }

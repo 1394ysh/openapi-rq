@@ -112,13 +112,7 @@ export async function fzfSelect(
     // 레이아웃: 검색창을 상단에
     args.push("--layout", "reverse");
 
-    // 색상 설정 (sync-interactive.sh와 동일)
-    args.push(
-      "--color=fg:#d0d0d0,bg:#121212,hl:#5f87af",
-      "--color=fg+:#d0d0d0,bg+:#262626,hl+:#5fd7ff",
-      "--color=info:#afaf87,prompt:#d7005f,pointer:#af5fff",
-      "--color=marker:#87ff00,spinner:#af5fff,header:#87afaf"
-    );
+    // 터미널 기본 컬러 사용 (커스텀 컬러 비활성화)
 
     // 키 바인딩
     if (options.multi) {

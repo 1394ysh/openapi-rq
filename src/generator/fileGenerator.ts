@@ -119,14 +119,12 @@ function generateFileContent(options: GenerateContentOptions): string {
 
   // 요청/응답 스키마 추출 (content-type에 관계없이 첫 번째 스키마 사용)
   const requestSchema = getFirstSchema(operation.requestBody?.content);
-  const successResponse =
-    operation.responses?.["200"] || operation.responses?.["201"];
-  const responseSchema = getFirstSchema(successResponse?.content);
-  const errorResponse =
-    operation.responses?.["400"] ||
-    operation.responses?.["500"] ||
-    operation.responses?.["default"];
-  const errorSchema = getFirstSchema(errorResponse?.content);
+
+  // 성공 응답 추출 (2XX 패턴, 204 No Content 지원)
+  const successResponseInfo = getSuccessResponse(operation.responses);
+
+  // 에러 응답 추출 (4XX, 5XX 패턴 지원, 여러 에러 타입 union)
+  const errorSchemas = getErrorSchemas(operation.responses);
 
   // 타입 문자열 생성
   const pathParamsType = generatePathParamsType(pathParams);
@@ -134,11 +132,20 @@ function generateFileContent(options: GenerateContentOptions): string {
   const bodyType = requestSchema
     ? schemaToTypeString(requestSchema, openApiSpec)
     : "undefined";
-  const responseType = responseSchema
-    ? schemaToTypeString(responseSchema, openApiSpec)
-    : "void";
-  const errorType = errorSchema
-    ? schemaToTypeString(errorSchema, openApiSpec)
+
+  // 204 No Content는 void
+  const responseType = successResponseInfo.isNoContent
+    ? "void"
+    : successResponseInfo.schema
+      ? schemaToTypeString(successResponseInfo.schema, openApiSpec)
+      : "void";
+
+  // 여러 에러 타입을 union으로 합침
+  const errorType = errorSchemas.length > 0
+    ? errorSchemas
+        .map((schema) => schemaToTypeString(schema, openApiSpec))
+        .filter((type, index, arr) => arr.indexOf(type) === index) // 중복 제거
+        .join(" | ")
     : "unknown";
 
   // 필수 여부 확인
@@ -532,4 +539,101 @@ function getFirstSchema(
   // 첫 번째 content-type의 스키마 반환
   const firstKey = Object.keys(content)[0];
   return firstKey ? content[firstKey]?.schema : undefined;
+}
+
+interface ResponseInfo {
+  schema: SchemaObject | undefined;
+  statusCode: string;
+  isNoContent: boolean;
+}
+
+/**
+ * 성공 응답(2XX) 추출
+ * 우선순위: 200 > 201 > 202 > 203 > 2XX > default
+ * 204 No Content는 별도 처리
+ */
+function getSuccessResponse(
+  responses: Record<string, { description?: string; content?: Record<string, { schema?: SchemaObject }> }> | undefined
+): ResponseInfo {
+  if (!responses) {
+    return { schema: undefined, statusCode: "200", isNoContent: false };
+  }
+
+  // 204 No Content 확인
+  if (responses["204"]) {
+    return { schema: undefined, statusCode: "204", isNoContent: true };
+  }
+
+  // 구체적인 2XX 코드 우선
+  const successCodes = ["200", "201", "202", "203"];
+  for (const code of successCodes) {
+    if (responses[code]) {
+      return {
+        schema: getFirstSchema(responses[code].content),
+        statusCode: code,
+        isNoContent: false,
+      };
+    }
+  }
+
+  // 2XX 패턴 (와일드카드)
+  if (responses["2XX"]) {
+    return {
+      schema: getFirstSchema(responses["2XX"].content),
+      statusCode: "2XX",
+      isNoContent: false,
+    };
+  }
+
+  // default를 성공으로 사용하는 경우 (에러가 아닌 경우)
+  if (responses["default"] && !responses["4XX"] && !responses["5XX"]) {
+    return {
+      schema: getFirstSchema(responses["default"].content),
+      statusCode: "default",
+      isNoContent: false,
+    };
+  }
+
+  return { schema: undefined, statusCode: "200", isNoContent: false };
+}
+
+/**
+ * 에러 응답(4XX, 5XX) 추출 및 union 타입 생성
+ * 여러 에러 타입이 있으면 union으로 합침
+ */
+function getErrorSchemas(
+  responses: Record<string, { description?: string; content?: Record<string, { schema?: SchemaObject }> }> | undefined
+): SchemaObject[] {
+  if (!responses) return [];
+
+  const errorSchemas: SchemaObject[] = [];
+  const errorCodes: string[] = [];
+
+  // 모든 키 순회
+  for (const code of Object.keys(responses)) {
+    // 4XX, 5XX 패턴
+    if (code === "4XX" || code === "5XX") {
+      const schema = getFirstSchema(responses[code].content);
+      if (schema) errorSchemas.push(schema);
+      continue;
+    }
+
+    // 개별 4xx, 5xx 코드
+    const numCode = parseInt(code, 10);
+    if (numCode >= 400 && numCode < 600) {
+      const schema = getFirstSchema(responses[code].content);
+      if (schema) {
+        errorSchemas.push(schema);
+        errorCodes.push(code);
+      }
+    }
+  }
+
+  // default를 에러로 사용하는 경우
+  if (responses["default"] && errorSchemas.length === 0) {
+    const schema = getFirstSchema(responses["default"].content);
+    if (schema) errorSchemas.push(schema);
+  }
+
+  return errorSchemas;
 }

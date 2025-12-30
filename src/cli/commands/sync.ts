@@ -1,36 +1,17 @@
-import fs from "fs/promises";
 import path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import inquirer from "inquirer";
 import { fetchOpenApiSpec } from "../../parser/openapi.js";
+import { extractAllApis } from "../../parser/apis.js";
 import { generateApiFile } from "../../generator/fileGenerator.js";
 import { getReactQueryConfig } from "../prompts/selectReactQueryVersion.js";
-
-const CONFIG_FILE_NAME = "orq.config.json";
+import { loadConfigSimple } from "../../config/loader.js";
+import { generateFileName } from "../../utils/files.js";
 
 interface SyncOptions {
   spec?: string;
   force?: boolean;
-}
-
-interface SpecConfig {
-  url: string;
-  description?: string;
-}
-
-interface GenerateConfig {
-  queryHook?: boolean;
-  mutationHook?: boolean;
-  suspenseHook?: boolean;
-}
-
-interface OrqConfig {
-  outputPath: string;
-  reactQueryVersion: "v3" | "v4" | "v5";
-  specs?: Record<string, SpecConfig>;
-  generate?: GenerateConfig;
-  [key: string]: unknown;
 }
 
 /**
@@ -42,8 +23,7 @@ export async function runSync(options: SyncOptions): Promise<void> {
   console.log(chalk.bold("========================================\n"));
 
   // Check config file
-  const configPath = path.join(process.cwd(), CONFIG_FILE_NAME);
-  const config = await loadConfig(configPath);
+  const config = await loadConfigSimple();
 
   if (!config) {
     console.log(chalk.red("orq.config.json not found."));
@@ -115,7 +95,9 @@ export async function runSync(options: SyncOptions): Promise<void> {
   }
 
   // React Query config
-  const reactQueryConfig = getReactQueryConfig(config.reactQueryVersion);
+  const configVersion = config.reactQueryVersion || config.reactQuery?.version || "v5";
+  const reactQueryConfig = getReactQueryConfig(configVersion);
+  const outputPath = config.outputPath || "src/api";
 
   // Sync each spec
   let totalGenerated = 0;
@@ -145,7 +127,7 @@ export async function runSync(options: SyncOptions): Promise<void> {
         const fileName = generateFileName(api.method, api.path);
         const filePath = path.join(
           process.cwd(),
-          config.outputPath,
+          outputPath,
           specName,
           fileName
         );
@@ -160,8 +142,12 @@ export async function runSync(options: SyncOptions): Promise<void> {
             hookOptions: config.generate,
           });
           generated++;
-        } catch {
+        } catch (error) {
           failed++;
+          // 에러 로깅 추가
+          if (process.env.DEBUG) {
+            console.error(`Failed to generate ${filePath}:`, error);
+          }
         }
       }
 
@@ -190,49 +176,4 @@ export async function runSync(options: SyncOptions): Promise<void> {
     console.log(`  ${chalk.red("Failed:")} ${totalFailed}`);
   }
   console.log("");
-}
-
-/**
- * Extract all APIs from spec
- */
-function extractAllApis(
-  spec: any
-): Array<{ method: string; path: string; operationId: string }> {
-  const apis: Array<{ method: string; path: string; operationId: string }> = [];
-
-  for (const [path, methods] of Object.entries(spec.paths || {})) {
-    for (const [method, operation] of Object.entries(
-      methods as Record<string, any>
-    )) {
-      if (["get", "post", "put", "patch", "delete"].includes(method)) {
-        apis.push({
-          method,
-          path,
-          operationId: operation.operationId || `${method}_${path}`,
-        });
-      }
-    }
-  }
-
-  return apis;
-}
-
-/**
- * Generate file path
- */
-function generateFileName(method: string, apiPath: string): string {
-  const cleanPath = apiPath.replace(/^\//, "");
-  return `${method.toLowerCase()}/${cleanPath}.ts`;
-}
-
-/**
- * Load config file
- */
-async function loadConfig(configPath: string): Promise<OrqConfig | null> {
-  try {
-    const content = await fs.readFile(configPath, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return null;
-  }
 }
