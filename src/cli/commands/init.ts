@@ -42,12 +42,29 @@ export async function runInit(options: InitOptions): Promise<void> {
   // Step 2: Select React Query version
   const reactQueryConfig = await selectReactQueryVersion();
 
+  // Step 3: Select keepSpecPrefix option
+  const { keepSpecPrefix } = await inquirer.prompt([
+    {
+      type: "confirm",
+      name: "keepSpecPrefix",
+      message: "Keep spec prefix in API URLs? (e.g., PETSTORE:/pet/{petId})",
+      default: true,
+    },
+  ]);
+
+  // Show explanation based on selection
+  if (keepSpecPrefix) {
+    console.log(chalk.gray("  → Use interceptor to route baseURL by prefix"));
+  } else {
+    console.log(chalk.gray("  → Use single baseURL with axios.create({ baseURL })"));
+  }
+
   const config: ProjectConfig = {
     outputPath: path.resolve(process.cwd(), outputPath),
     reactQueryVersion: reactQueryConfig.version,
   };
 
-  // Step 3: Save config file
+  // Step 4: Save config file
   const configPath = path.join(process.cwd(), CONFIG_FILE_NAME);
   const configExists = await fileExists(configPath);
 
@@ -78,7 +95,7 @@ export async function runInit(options: InitOptions): Promise<void> {
           outputPath: outputPath,
           reactQueryVersion: reactQueryConfig.version,
           httpClient: "axios",
-          typescript: true,
+          keepSpecPrefix: keepSpecPrefix,
           specs: {
             PETSTORE: {
               url: "https://petstore3.swagger.io/api/v3/openapi.json",
@@ -98,10 +115,10 @@ export async function runInit(options: InitOptions): Promise<void> {
     );
     spinner.succeed("Configuration file created");
 
-    // Step 4: Create utility files
+    // Step 5: Create utility files
     spinner.start("Creating utility files...");
     const fullOutputPath = path.join(process.cwd(), outputPath);
-    await generateUtilityFiles(fullOutputPath);
+    await generateUtilityFiles(fullOutputPath, keepSpecPrefix);
     spinner.succeed("Utility files created");
 
     console.log(chalk.green("\n✓ Initialization complete!\n"));

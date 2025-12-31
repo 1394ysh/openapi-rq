@@ -30,6 +30,13 @@ export interface OrqConfig {
   };
   generate?: GenerateConfig;
   specs?: Record<string, SpecConfig>;
+  /**
+   * API URL에 스펙 접두사 유지 여부
+   * true: "PETSTORE:/pet/{petId}" 형태 유지 (인터셉터에서 baseURL 라우팅 시 사용)
+   * false: "/pet/{petId}" 형태로 접두사 제거 (단일 baseURL 사용 시)
+   * @default true
+   */
+  keepSpecPrefix?: boolean;
   [key: string]: unknown;
 }
 

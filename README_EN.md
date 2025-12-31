@@ -143,6 +143,7 @@ After running `orq init`, an `orq.config.json` file is created:
   "outputPath": "./src/api",
   "reactQueryVersion": "v5",
   "httpClient": "axios",
+  "keepSpecPrefix": true,
   "specs": {
     "PETSTORE": {
       "url": "https://petstore3.swagger.io/api/v3/openapi.json",
@@ -165,10 +166,46 @@ After running `orq init`, an `orq.config.json` file is created:
 | `outputPath` | `string` | `"./src/api"` | Output directory for generated files |
 | `reactQueryVersion` | `"v3" \| "v4" \| "v5"` | `"v5"` | React Query version |
 | `httpClient` | `"axios"` | `"axios"` | HTTP client (axios only for now) |
+| `keepSpecPrefix` | `boolean` | `true` | Keep spec prefix in API URLs (see below) |
 | `generate.queryHook` | `boolean` | `true` | Generate `useQuery` hooks |
 | `generate.mutationHook` | `boolean` | `true` | Generate `useMutation` hooks |
 | `generate.suspenseHook` | `boolean` | `false` | Generate `useSuspenseQuery` hooks (v5 only) |
 | `generate.infiniteQueryHook` | `boolean` | `false` | Generate `useInfiniteQuery` hooks for pagination |
+
+### keepSpecPrefix Option
+
+Determines whether to keep the spec name prefix in API URLs.
+
+#### `keepSpecPrefix: true` (default) - Multiple API Servers
+
+When using multiple OpenAPI specs (domains) with different baseURLs:
+
+```typescript
+// Generated URL: "PETSTORE:/pet/{petId}"
+// Route baseURL by spec prefix in axios interceptor
+http.interceptors.request.use((config) => {
+  if (config.url?.startsWith("PETSTORE:")) {
+    config.baseURL = "https://petstore3.swagger.io/api/v3";
+    config.url = config.url.replace("PETSTORE:", "");
+  } else if (config.url?.startsWith("USER_API:")) {
+    config.baseURL = "https://user-api.example.com";
+    config.url = config.url.replace("USER_API:", "");
+  }
+  return config;
+});
+```
+
+#### `keepSpecPrefix: false` - Single API Server
+
+When using a single baseURL:
+
+```typescript
+// Generated URL: "/pet/{petId}" (prefix removed)
+const http = axios.create({
+  baseURL: "https://petstore3.swagger.io/api/v3"
+});
+setHttpClient(http);
+```
 
 ## Usage
 

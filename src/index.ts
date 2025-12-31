@@ -5,6 +5,7 @@
  */
 import { Command } from "commander";
 import chalk from "chalk";
+import { createRequire } from "module";
 import { runInteractiveMode } from "./cli/commands/generate.js";
 import { runInit } from "./cli/commands/init.js";
 import { listSpecs } from "./cli/commands/list.js";
@@ -13,12 +14,15 @@ import { runRemove } from "./cli/commands/remove.js";
 import { runSync } from "./cli/commands/sync.js";
 import { runCreate } from "./cli/commands/create.js";
 
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
+
 const program = new Command();
 
 program
   .name("orq")
   .description("OpenAPI to React Query code generator")
-  .version("0.1.0");
+  .version(version);
 
 // Initialize command
 program

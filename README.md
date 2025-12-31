@@ -143,6 +143,7 @@ npx openapi-rq create --method GET --path /users/{userId} --spec MY_API
   "outputPath": "./src/api",
   "reactQueryVersion": "v5",
   "httpClient": "axios",
+  "keepSpecPrefix": true,
   "specs": {
     "PETSTORE": {
       "url": "https://petstore3.swagger.io/api/v3/openapi.json",
@@ -165,10 +166,46 @@ npx openapi-rq create --method GET --path /users/{userId} --spec MY_API
 | `outputPath` | `string` | `"./src/api"` | 생성된 파일의 출력 디렉토리 |
 | `reactQueryVersion` | `"v3" \| "v4" \| "v5"` | `"v5"` | React Query 버전 |
 | `httpClient` | `"axios"` | `"axios"` | HTTP 클라이언트 (현재 axios만 지원) |
+| `keepSpecPrefix` | `boolean` | `true` | API URL에 스펙 접두사 유지 여부 (아래 설명 참고) |
 | `generate.queryHook` | `boolean` | `true` | `useQuery` 훅 생성 |
 | `generate.mutationHook` | `boolean` | `true` | `useMutation` 훅 생성 |
 | `generate.suspenseHook` | `boolean` | `false` | `useSuspenseQuery` 훅 생성 (v5 전용) |
 | `generate.infiniteQueryHook` | `boolean` | `false` | 페이지네이션용 `useInfiniteQuery` 훅 생성 |
+
+### keepSpecPrefix 옵션
+
+API URL에 스펙 이름 접두사를 유지할지 결정합니다.
+
+#### `keepSpecPrefix: true` (기본값) - 여러 API 서버 사용 시
+
+여러 OpenAPI 스펙(도메인)을 사용하고 각각 다른 baseURL이 필요한 경우:
+
+```typescript
+// 생성된 URL: "PETSTORE:/pet/{petId}"
+// axios 인터셉터에서 스펙별 baseURL 라우팅
+http.interceptors.request.use((config) => {
+  if (config.url?.startsWith("PETSTORE:")) {
+    config.baseURL = "https://petstore3.swagger.io/api/v3";
+    config.url = config.url.replace("PETSTORE:", "");
+  } else if (config.url?.startsWith("USER_API:")) {
+    config.baseURL = "https://user-api.example.com";
+    config.url = config.url.replace("USER_API:", "");
+  }
+  return config;
+});
+```
+
+#### `keepSpecPrefix: false` - 단일 API 서버 사용 시
+
+하나의 baseURL만 사용하는 경우:
+
+```typescript
+// 생성된 URL: "/pet/{petId}" (접두사 제거됨)
+const http = axios.create({
+  baseURL: "https://petstore3.swagger.io/api/v3"
+});
+setHttpClient(http);
+```
 
 ## 사용법
 

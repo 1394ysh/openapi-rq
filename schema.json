@@ -25,9 +25,9 @@
       "description": "HTTP client to use (currently only axios is supported)",
       "default": "axios"
     },
-    "typescript": {
+    "keepSpecPrefix": {
       "type": "boolean",
-      "description": "Generate TypeScript files",
+      "description": "Keep spec prefix in API URLs. When true, URLs are like 'PETSTORE:/pet/{petId}' (use interceptor to route baseURL). When false, URLs are like '/pet/{petId}' (use single baseURL with axios.create).",
       "default": true
     },
     "specs": {
