@@ -12,7 +12,7 @@ import {
 import { fetchOpenApiSpec } from "../../parser/openapi.js";
 import { extractAllApis } from "../../parser/apis.js";
 import { generateApiFile } from "../../generator/fileGenerator.js";
-import { generateUtilityFiles } from "../../generator/templates.js";
+import { generateUtilityFiles, orqFolderExists } from "../../generator/templates.js";
 import { loadConfigSimple, type OrqConfig, type ReactQueryVersion } from "../../config/loader.js";
 import { fileExists, generateFileName } from "../../utils/files.js";
 import type { SpecName } from "../../config/specs.js";
@@ -100,10 +100,13 @@ export async function runInteractiveMode(options: GenerateOptions): Promise<void
   // Step 5: Select output path
   const outputPath = options.output || config?.outputPath || await selectOutputPath();
 
-  // Step 6: Ensure utility files exist
+  // Step 6: Ensure utility files exist (only if not already present)
   const fullOutputPath = process.cwd() + "/" + outputPath;
-  await generateUtilityFiles(fullOutputPath);
-  console.log(chalk.green("✓ Utility files created"));
+  const utilsExist = await orqFolderExists(fullOutputPath);
+  if (!utilsExist) {
+    await generateUtilityFiles(fullOutputPath);
+    console.log(chalk.green("✓ Utility files created"));
+  }
 
   // Step 7: Summary and confirmation
   console.log(chalk.bold("\n========================================"));
