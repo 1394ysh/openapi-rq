@@ -1,6 +1,6 @@
 {
   "name": "openapi-rq",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "OpenAPI to React Query code generator with shadcn-style DX",
   "type": "module",
   "main": "./dist/index.js",
